@@ -54,7 +54,7 @@ def add_file():
     if file.filename == '':
         return jsonify({'error': 'No selected file'}), 400
 
-    # Check MIDI extension
+    # Validate MIDI extension
     if not (file.filename.lower().endswith('.mid') or file.filename.lower().endswith('.midi')):
         return jsonify({'error': 'File must be a MIDI (.mid/.midi)'}), 400
 
@@ -66,12 +66,15 @@ def add_file():
         return jsonify({'error': 'Name is required'}), 400
 
     try:
-        tag_ids = json.loads(tags_json)
-    except Exception:
-        tag_ids = []
+        tag_names = json.loads(tags_json)
+        if not isinstance(tag_names, list):
+            raise ValueError("Tags must be a list of names")
+    except Exception as e:
+        return jsonify({'error': 'Invalid tags format'}), 400
 
-    file_bytes = file.read()  # Read the uploaded file as bytes
+    file_bytes = file.read()
 
+    # Create the MidiFile instance
     midi_file = MidiFile(
         name=name,
         filename=file.filename,
@@ -79,14 +82,26 @@ def add_file():
         description=description
     )
 
-    if tag_ids:
-        tags = Tag.query.filter(Tag.id.in_(tag_ids)).all()
-        midi_file.tags = tags
+    # Process tag names into Tag objects (create if they don't exist)
+    tags = []
+    for tag_name in tag_names:
+        tag_name = tag_name.strip()
+        if not tag_name:
+            continue
+        tag = Tag.query.filter_by(tag=tag_name).first()
+        if not tag:
+            tag = Tag(tag=tag_name)
+            db.session.add(tag)
+            db.session.flush()  # ensures tag.id is available without full commit
+        tags.append(tag)
+
+    midi_file.tags = tags
 
     db.session.add(midi_file)
     db.session.commit()
 
     return jsonify({'message': 'File added successfully', 'id': midi_file.id})
+
 
 # Endpoint to get files based on search filters
 @app.route('/getfiles', methods=['POST'])

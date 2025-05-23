@@ -145,8 +145,12 @@ def get_files():
 
     return jsonify(result)
 
-@app.route('/updatefile/<int:file_id>', methods=['POST'])
-def update_file(file_id):
+@app.route('/updatefile', methods=['POST'])
+def update_file():
+    file_id = request.form.get('id')
+    if not file_id:
+        return jsonify({'error': 'File ID not provided'}), 400
+
     midi_file = MidiFile.query.get(file_id)
     if not midi_file:
         return jsonify({'error': 'File not found'}), 404
@@ -160,6 +164,7 @@ def update_file(file_id):
     if description is not None:
         midi_file.description = description
 
+    # Parse tags
     try:
         tag_names = json.loads(tags_json)
         if not isinstance(tag_names, list):
@@ -167,7 +172,7 @@ def update_file(file_id):
     except Exception:
         return jsonify({'error': 'Invalid tags format'}), 400
 
-    # Sanitize tags
+    # Sanitize and deduplicate tags
     seen = set()
     unique_tag_names = []
     for t in tag_names:
@@ -190,7 +195,7 @@ def update_file(file_id):
         tags.append(tag)
     midi_file.tags = tags
 
-    # Update file if provided
+    # Update file data if provided
     if 'file' in request.files:
         file = request.files['file']
         if file.filename.lower().endswith(('.mid', '.midi')):
@@ -202,17 +207,25 @@ def update_file(file_id):
     return jsonify({'message': 'File updated successfully'})
 
 
-@app.route('/downloadfile/<int:file_id>', methods=['GET'])
-def download_file(file_id):
-    midi_file = MidiFile.query.get(file_id)
-    if not midi_file:
-        return jsonify({'error': 'File not found'}), 404
+
+@app.route('/downloadfile', methods=['POST'])
+def download_file():
+    data = request.get_json()
+    file_id = data.get('id')
+
+    if not file_id:
+        return jsonify({'error': 'File ID not provided'}), 400
+
+    midi_file = MidiFile.query.get_or_404(file_id)
+
+    if not midi_file.file_data:
+        return jsonify({'error': 'No file data found'}), 404
 
     return send_file(
         io.BytesIO(midi_file.file_data),
         mimetype='audio/midi',
         as_attachment=True,
-        download_name=f"{midi_file.name}.mid"
+        download_name=f"{midi_file.name or 'download'}.mid"
     )
 
 @app.route('/deletefile', methods=['POST'])

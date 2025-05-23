@@ -28,7 +28,6 @@ class MidiFile(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(150), nullable=False)
     file_data = db.Column(LargeBinary, nullable=False)  # binary midi data stored here
-    filename = db.Column(db.String(255), nullable=False)  # original filename (for extension)
     description = db.Column(db.Text)
     tags = db.relationship('Tag', secondary=file_tag, backref='files')
 
@@ -69,30 +68,38 @@ def add_file():
         tag_names = json.loads(tags_json)
         if not isinstance(tag_names, list):
             raise ValueError("Tags must be a list of names")
-    except Exception as e:
+    except Exception:
         return jsonify({'error': 'Invalid tags format'}), 400
 
     file_bytes = file.read()
 
+    # Remove duplicates in a case-insensitive way, preserving original casing of first occurrence
+    seen = set()
+    unique_tag_names = []
+    for t in tag_names:
+        t_clean = t.strip()
+        if not t_clean:
+            continue
+        t_lower = t_clean.lower()
+        if t_lower not in seen:
+            seen.add(t_lower)
+            unique_tag_names.append(t_clean)
+
     # Create the MidiFile instance
     midi_file = MidiFile(
         name=name,
-        filename=file.filename,
         file_data=file_bytes,
         description=description
     )
 
-    # Process tag names into Tag objects (create if they don't exist)
+    # Process unique tag names into Tag objects (create if they don't exist)
     tags = []
-    for tag_name in tag_names:
-        tag_name = tag_name.strip()
-        if not tag_name:
-            continue
+    for tag_name in unique_tag_names:
         tag = Tag.query.filter_by(tag=tag_name).first()
         if not tag:
             tag = Tag(tag=tag_name)
             db.session.add(tag)
-            db.session.flush()  # ensures tag.id is available without full commit
+            db.session.flush()
         tags.append(tag)
 
     midi_file.tags = tags
@@ -123,15 +130,14 @@ def get_files():
 
     files = query.all()
 
-    # Serialize response with all info, including tags
+    # Serialize response with tags as list of tag names only
     result = []
     for f in files:
         result.append({
             'id': f.id,
             'name': f.name,
-            'filename': f.filename,
             'description': f.description,
-            'tags': [{'id': t.id, 'tag': t.tag} for t in f.tags]
+            'tags': [t.tag for t in f.tags]  # just tag names
         })
 
     return jsonify(result)

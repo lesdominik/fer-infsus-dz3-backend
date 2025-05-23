@@ -4,6 +4,8 @@ from sqlalchemy import LargeBinary
 from flask_migrate import Migrate
 from flask_cors import CORS
 from waitress import serve
+from flask import send_file
+import io
 import os
 import json
 
@@ -142,6 +144,76 @@ def get_files():
         })
 
     return jsonify(result)
+
+@app.route('/updatefile/<int:file_id>', methods=['POST'])
+def update_file(file_id):
+    midi_file = MidiFile.query.get(file_id)
+    if not midi_file:
+        return jsonify({'error': 'File not found'}), 404
+
+    name = request.form.get('name')
+    description = request.form.get('description')
+    tags_json = request.form.get('tags', '[]')
+
+    if name:
+        midi_file.name = name
+    if description is not None:
+        midi_file.description = description
+
+    try:
+        tag_names = json.loads(tags_json)
+        if not isinstance(tag_names, list):
+            raise ValueError("Tags must be a list of names")
+    except Exception:
+        return jsonify({'error': 'Invalid tags format'}), 400
+
+    # Sanitize tags
+    seen = set()
+    unique_tag_names = []
+    for t in tag_names:
+        t_clean = t.strip()
+        if not t_clean:
+            continue
+        t_lower = t_clean.lower()
+        if t_lower not in seen:
+            seen.add(t_lower)
+            unique_tag_names.append(t_clean)
+
+    # Update tags
+    tags = []
+    for tag_name in unique_tag_names:
+        tag = Tag.query.filter_by(tag=tag_name).first()
+        if not tag:
+            tag = Tag(tag=tag_name)
+            db.session.add(tag)
+            db.session.flush()
+        tags.append(tag)
+    midi_file.tags = tags
+
+    # Update file if provided
+    if 'file' in request.files:
+        file = request.files['file']
+        if file.filename.lower().endswith(('.mid', '.midi')):
+            midi_file.file_data = file.read()
+        else:
+            return jsonify({'error': 'File must be a MIDI (.mid/.midi)'}), 400
+
+    db.session.commit()
+    return jsonify({'message': 'File updated successfully'})
+
+
+@app.route('/downloadfile/<int:file_id>', methods=['GET'])
+def download_file(file_id):
+    midi_file = MidiFile.query.get(file_id)
+    if not midi_file:
+        return jsonify({'error': 'File not found'}), 404
+
+    return send_file(
+        io.BytesIO(midi_file.file_data),
+        mimetype='audio/midi',
+        as_attachment=True,
+        download_name=f"{midi_file.name}.mid"
+    )
 
 @app.route('/deletefile/<int:file_id>', methods=['DELETE'])
 def delete_file(file_id):

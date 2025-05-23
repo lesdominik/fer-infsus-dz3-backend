@@ -218,13 +218,18 @@ def download_file(file_id):
 @app.route('/deletefile', methods=['POST'])
 def delete_file():
     data = request.get_json()
-    midi_file = data.get('id')
+    file_id = data.get('id')
+    if not file_id:
+        return jsonify({'error': 'No file ID provided'}), 400
+
+    # Pretpostavljamo da je naziv tvoje SQLAlchemy klase `MidiFile`
+    midi_file = MidiFile.query.get(file_id)
     if not midi_file:
         return jsonify({'error': 'File not found'}), 404
 
     db.session.delete(midi_file)
     db.session.commit()
-    return jsonify({'message': 'File deleted successfully'})
+    return jsonify({'message': 'File deleted successfully'}), 200
 
 
 if __name__ == "__main__":

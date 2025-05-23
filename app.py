@@ -88,7 +88,6 @@ def add_file():
     # Create the MidiFile instance
     midi_file = MidiFile(
         name=name,
-        filename=file.filename,  # Make sure this is included
         file_data=file_bytes,
         description=description
     )

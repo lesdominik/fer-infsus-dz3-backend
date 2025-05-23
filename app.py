@@ -215,9 +215,10 @@ def download_file(file_id):
         download_name=f"{midi_file.name}.mid"
     )
 
-@app.route('/deletefile/<int:file_id>', methods=['DELETE'])
-def delete_file(file_id):
-    midi_file = MidiFile.query.get(file_id)
+@app.route('/deletefile', methods=['POST'])
+def delete_file():
+    data = request.get_json()
+    midi_file = data.get('id')
     if not midi_file:
         return jsonify({'error': 'File not found'}), 404
 

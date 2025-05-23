@@ -88,6 +88,7 @@ def add_file():
     # Create the MidiFile instance
     midi_file = MidiFile(
         name=name,
+        filename=file.filename,  # Make sure this is included
         file_data=file_bytes,
         description=description
     )
@@ -122,8 +123,9 @@ def get_files():
 
     query = MidiFile.query
 
-    if tag_ids:
-        query = query.filter(MidiFile.tags.any(Tag.id.in_(tag_ids)))
+    # Require all selected tags (logical AND)
+    for tag_id in tag_ids:
+        query = query.filter(MidiFile.tags.any(Tag.id == tag_id))
 
     if search:
         query = query.filter(MidiFile.name.ilike(f'%{search}%'))

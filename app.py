@@ -143,6 +143,16 @@ def get_files():
 
     return jsonify(result)
 
+@app.route('/deletefile/<int:file_id>', methods=['DELETE'])
+def delete_file(file_id):
+    midi_file = MidiFile.query.get(file_id)
+    if not midi_file:
+        return jsonify({'error': 'File not found'}), 404
+
+    db.session.delete(midi_file)
+    db.session.commit()
+    return jsonify({'message': 'File deleted successfully'})
+
 
 if __name__ == "__main__":
     serve(app, host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))

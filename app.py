@@ -8,7 +8,7 @@ import os
 import json
 
 app = Flask(__name__)
-CORS(app)  # Allow React frontend requests
+CORS(app, methods=['GET', 'POST', 'DELETE'])  # Allow React frontend requests
 
 # Config from environment
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')

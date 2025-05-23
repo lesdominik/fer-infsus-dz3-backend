@@ -3,6 +3,7 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import LargeBinary
 from flask_migrate import Migrate
 from flask_cors import CORS
+from waitress import serve
 import os
 import json
 
@@ -121,5 +122,5 @@ def get_files():
     return jsonify(result)
 
 
-if __name__ == '__main__':
-    app.run(debug=True)
+if __name__ == "__main__":
+    serve(app, host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
